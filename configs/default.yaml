@@ -5,7 +5,13 @@ data:
     - "data/combined_data_3.txt"
     - "data/combined_data_4.txt"
   probe_file: "data/probe.txt"
-  movie_titles_file: "data/movie_titles.csv"
+  movies_file: "data/movie_titles_fixed.csv"
   chunk_size: 100_000
 
 output_dir: "checkpoints/"
+model_path: "checkpoints/model.pth"
+
+recommend:
+  num_recommendations: 10
+  movie_title: "Batman Begins"
+  user_id: 2380848
