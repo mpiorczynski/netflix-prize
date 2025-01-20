@@ -34,6 +34,7 @@ def print_ratings_info(ratings):
 def main(cfg: DictConfig):
     timestamp = time.strftime("%Y%m%d-%H:%M:%S")
     cfg.output_dir = os.path.join(cfg.output_dir, timestamp)
+    os.makedirs(cfg.output_dir, exist_ok=True)
 
     print(f"Config:\n{OmegaConf.to_yaml(cfg)}")
     OmegaConf.save(cfg, os.path.join(cfg.output_dir, "config.yaml"))
