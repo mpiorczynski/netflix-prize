@@ -7,3 +7,5 @@ data:
   probe_file: "data/probe.txt"
   movie_titles_file: "data/movie_titles.csv"
   chunk_size: 100_000
+
+output_dir: "checkpoints/"

@@ -1,6 +1,6 @@
 model:
   class_name: surprise.KNNWithMeans
-  
+
   hparams:
     k: 50
     min_k: 1
@@ -8,4 +8,4 @@ model:
       name: cosine
       user_based: False
 
-  save_dir: "checkpoints/centered_knn"
+output_dir: "checkpoints/centered_knn"

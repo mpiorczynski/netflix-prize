@@ -32,8 +32,11 @@ def print_ratings_info(ratings):
 
 @load_config("configs/default.yaml")
 def main(cfg: DictConfig):
+    timestamp = time.strftime("%Y%m%d-%H:%M:%S")
+    cfg.output_dir = os.path.join(cfg.output_dir, timestamp)
+
     print(f"Config:\n{OmegaConf.to_yaml(cfg)}")
-    OmegaConf.save(cfg, os.path.join(cfg.model.save_dir, "config.yaml"))
+    OmegaConf.save(cfg, os.path.join(cfg.output_dir, "config.yaml"))
 
     # model
     model_class = import_class_by_name(cfg.model.class_name)
@@ -51,13 +54,15 @@ def main(cfg: DictConfig):
     print("Splitting data...")
     probe_df = load_probe(cfg.data.probe_file, cfg.data.chunk_size)
     train_df, test_df = train_test_split(ratings_df, probe_df)
-    print(f"Train set: {train_df.shape[0]} ratings") # 99,072,112
-    print(f"Test set: {test_df.shape[0]} ratings") # 1,408,395
-    del ratings_df, probe_df # free memory
+    print(f"Train set: {train_df.shape[0]} ratings")  # 99,072,112
+    print(f"Test set: {test_df.shape[0]} ratings")  # 1,408,395
+    del ratings_df, probe_df  # free memory
 
     reader = Reader(rating_scale=(1, 5))
-    trainset = Dataset.load_from_df(train_df[["user_id", "movie_id", "rating"]], reader).build_full_trainset()
-    del train_df # free memory
+    trainset = Dataset.load_from_df(
+        train_df[["user_id", "movie_id", "rating"]], reader
+    ).build_full_trainset()
+    del train_df  # free memory
 
     # train
     print("Training...")
@@ -66,18 +71,20 @@ def main(cfg: DictConfig):
     train_end = time.time()
     train_time = train_end - train_start
     print(f"Model trained in {format_time(train_time)}")
-    del trainset # free memory
+    del trainset  # free memory
 
     # save
-    save_model(cfg.model.save_dir, model)
-    print(f"Model saved to {cfg.model.save_dir}")
+    save_model(cfg.output_dir, model)
+    print(f"Model saved to {cfg.output_dir}")
 
     # test
     print("Evaluating...")
     testset = (
-        Dataset.load_from_df(test_df[["user_id", "movie_id", "rating"]], reader).build_full_trainset().build_testset()
+        Dataset.load_from_df(test_df[["user_id", "movie_id", "rating"]], reader)
+        .build_full_trainset()
+        .build_testset()
     )
-    del test_df # free memory
+    del test_df  # free memory
     predictions = model.test(testset)
     rmse = surprise_metrics.rmse(predictions)
     mae = surprise_metrics.mae(predictions)
@@ -90,10 +97,11 @@ def main(cfg: DictConfig):
         f"recall@{at_k}": recall_at_k,
     }
     print(f"Metrics:\n{metrics}")
-    with open(os.path.join(cfg.model.save_dir, "metrics.json"), "w") as f:
+    with open(os.path.join(cfg.output_dir, "metrics.json"), "w") as f:
         json.dump(metrics, f)
 
     print("Done.")
+
 
 if __name__ == "__main__":
     main()
