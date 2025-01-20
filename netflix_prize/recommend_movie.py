@@ -4,10 +4,11 @@ from netflix_prize.data import load_movies
 from netflix_prize.utils import format_number, load_model
 
 movie_title = "Batman Begins"
-model_path = "checkpoints/centered_knn.pkl"
+model_path = "checkpoints/centered_knn/model.pkl"
 top_k = 10
+movies_path = "data/movie_titles_fixed.csv"
 
-movies_df = load_movies("data/movie_titles_fixed.csv")
+movies_df = load_movies(movies_path)
 print(f"Number of movies in the database: {format_number(movies_df.shape[0])}")
 print(f"The oldest movie: {int(movies_df['year'].min())}")
 print(f"The newest movie: {int(movies_df['year'].max())}")
@@ -31,14 +32,15 @@ model = load_model(model_path)
 
 movie_inner_id = model.trainset.to_inner_iid(movie_raw_id)
 
-movie_neighbors_inner_ids = model.get_neighbors(movie_inner_id, k=top_k)
-movie_neighbors_raw_ids = (
-    model.trainset.to_raw_iid(inner_id) for inner_id in movie_neighbors_inner_ids
+print(f"Getting {top_k} similar movies to {movie_title} ({movie_year})...")
+similar_movies = model.get_neighbors(movie_inner_id, k=top_k)
+similar_movies = (
+    model.trainset.to_raw_iid(inner_id) for inner_id in similar_movies
 )
-movie_neighbors_titles = (movie_raw_id_to_title[raw_id] for raw_id in movie_neighbors_raw_ids)
+similar_movies = (movie_raw_id_to_title[raw_id] for raw_id in similar_movies)
 
 print()
 print(f"Recommended after watching {movie_title} ({movie_year}):")
 print("-" * 40)
-for i, movie in enumerate(movie_neighbors_titles):
+for i, movie in enumerate(similar_movies):
     print(f"{i+1}. ", movie)
