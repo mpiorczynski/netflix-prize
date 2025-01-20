@@ -1,9 +1,11 @@
-model_class: surprise.KNNWithMeans
-model_kwargs:
-  k: 50
-  min_k: 1
-  sim_options:
-    name: cosine
-    user_based: False
+model:
+  class_name: surprise.KNNWithMeans
+  
+  hparams:
+    k: 50
+    min_k: 1
+    sim_options:
+      name: cosine
+      user_based: False
 
-model_save_path: "checkpoints/knn_centered.pkl"
+  save_dir: "checkpoints/centered_knn"
