@@ -1,0 +1,10 @@
+model:
+  class_name: surprise.SVD
+
+  hparams:
+    n_factors: 20
+    n_epochs: 100
+    lr_all: 0.005
+    reg_all: 0.02
+
+output_dir: "checkpoints/svd"
