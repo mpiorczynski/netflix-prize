@@ -91,6 +91,7 @@ dependencies:
       - jupyterlab-pygments==0.3.0
       - jupyterlab-server==2.27.3
       - jupyterlab-widgets==3.0.13
+      - loguru==0.7.3
       - markdown-it-py==3.0.0
       - markupsafe==3.0.2
       - matplotlib-inline==0.1.7
@@ -164,4 +165,3 @@ dependencies:
       - webencodings==0.5.1
       - websocket-client==1.8.0
       - widgetsnbextension==4.0.13
-prefix: /Users/mikolajpiorczynski/miniconda3/envs/netflix-prize

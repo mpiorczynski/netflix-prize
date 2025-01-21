@@ -15,6 +15,7 @@ from netflix_prize.utils import (
     load_config,
     save_model,
 )
+from loguru import logger
 
 
 def print_ratings_info(ratings):
@@ -22,12 +23,12 @@ def print_ratings_info(ratings):
     num_items = ratings["movie_id"].nunique()
     num_ratings = len(ratings)
 
-    print(f"Number of users: {format_number(num_users)}")
-    print(f"Number of items: {format_number(num_items)}")
-    print(f"Number of ratings (1-5 stars): {format_number(num_ratings)}")
+    logger.info(f"Number of users: {format_number(num_users)}")
+    logger.info(f"Number of items: {format_number(num_items)}")
+    logger.info(f"Number of ratings (1-5 stars): {format_number(num_ratings)}")
 
     sparsity = num_ratings / (num_users * num_items)
-    print(f"Sparsity ratio: {sparsity:.2%}")
+    logger.info(f"Sparsity ratio: {sparsity:.2%}")
 
 
 @load_config("configs/default.yaml")
@@ -35,8 +36,9 @@ def main(cfg: DictConfig):
     timestamp = time.strftime("%Y%m%d-%H:%M:%S")
     cfg.output_dir = os.path.join(cfg.output_dir, timestamp)
     os.makedirs(cfg.output_dir, exist_ok=True)
+    logger.add(os.path.join(cfg.output_dir, "train.log"))
 
-    print(f"Config:\n{OmegaConf.to_yaml(cfg)}")
+    logger.info(f"Config:\n{OmegaConf.to_yaml(cfg)}")
     OmegaConf.save(cfg, os.path.join(cfg.output_dir, "config.yaml"))
 
     # model
@@ -44,19 +46,19 @@ def main(cfg: DictConfig):
     model = model_class(**cfg.model.hparams)
 
     # data
-    print("Loading ratings...")
+    logger.info("Loading ratings...")
     load_start = time.time()
     ratings_df = load_ratings(cfg.data.rating_files, cfg.data.chunk_size)
     load_end = time.time()
     load_time = load_end - load_start
-    print(f"Ratings loaded in {format_time(load_time)}")
+    logger.info(f"Ratings loaded in {format_time(load_time)}")
     print_ratings_info(ratings_df)
 
-    print("Splitting data...")
+    logger.info("Splitting data...")
     probe_df = load_probe(cfg.data.probe_file, cfg.data.chunk_size)
     train_df, test_df = train_test_split(ratings_df, probe_df)
-    print(f"Train set: {train_df.shape[0]} ratings")  # 99,072,112
-    print(f"Test set: {test_df.shape[0]} ratings")  # 1,408,395
+    logger.info(f"Train set: {train_df.shape[0]} ratings")  # 99,072,112
+    logger.info(f"Test set: {test_df.shape[0]} ratings")  # 1,408,395
     del ratings_df, probe_df  # free memory
 
     reader = Reader(rating_scale=(1, 5))
@@ -66,20 +68,20 @@ def main(cfg: DictConfig):
     del train_df  # free memory
 
     # train
-    print("Training...")
+    logger.info("Training...")
     train_start = time.time()
     model.fit(trainset)
     train_end = time.time()
     train_time = train_end - train_start
-    print(f"Model trained in {format_time(train_time)}")
+    logger.info(f"Model trained in {format_time(train_time)}")
     del trainset  # free memory
 
     # save
     save_model(cfg.output_dir, model)
-    print(f"Model saved to {cfg.output_dir}")
+    logger.info(f"Model saved to {cfg.output_dir}")
 
     # test
-    print("Evaluating...")
+    logger.info("Evaluating...")
     testset = (
         Dataset.load_from_df(test_df[["user_id", "movie_id", "rating"]], reader)
         .build_full_trainset()
@@ -87,21 +89,27 @@ def main(cfg: DictConfig):
     )
     del test_df  # free memory
     predictions = model.test(testset)
+
+    logger.info("Computing metrics...")
     rmse = surprise_metrics.rmse(predictions)
     mae = surprise_metrics.mae(predictions)
-    at_k = 5
-    precision_at_k, recall_at_k = precision_recall_at_k(predictions, k=at_k, threshold=4)
     metrics = {
         "rmse": rmse,
         "mae": mae,
-        f"precision@{at_k}": precision_at_k,
-        f"recall@{at_k}": recall_at_k,
     }
-    print(f"Metrics:\n{metrics}")
+    for at_k in [5, 10, 20, 50]:
+        precision_at_k, recall_at_k = precision_recall_at_k(
+            predictions, k=at_k, threshold=4
+        )
+
+        metrics[f"precision@{at_k}"] = precision_at_k
+        metrics[f"recall@{at_k}"] = recall_at_k
+
+    logger.info(f"Metrics:\n{metrics}")
     with open(os.path.join(cfg.output_dir, "metrics.json"), "w") as f:
         json.dump(metrics, f)
 
-    print("Done.")
+    logger.info("Done.")
 
 
 if __name__ == "__main__":
