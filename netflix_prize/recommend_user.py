@@ -1,8 +1,8 @@
 import numpy as np
+from loguru import logger
 from omegaconf import DictConfig
-from surprise import Dataset, Reader
 
-from netflix_prize.data import load_movies, load_ratings
+from netflix_prize.data import load_movies
 from netflix_prize.utils import format_number, load_config, load_model
 
 
@@ -10,13 +10,10 @@ def build_testset_anti_testset(trainset, ruid, fill=None):
     """All pairs (u, i) that are NOT in the training set"""
     fill = trainset.global_mean if fill is None else float(fill)
     iuid = trainset.to_inner_uid(ruid)
-    user_items = {j for (j, r) in trainset.ur[iuid]}
-    testset = [
-        (trainset.to_raw_uid(iuid), trainset.to_raw_iid(i), r)
-        for (i, r) in trainset.ur[iuid]
-    ]
+    user_items = {j for (j, _) in trainset.ur[iuid]}
+    testset = [(ruid, trainset.to_raw_iid(i), r) for (i, r) in trainset.ur[iuid]]
     anti_testset = [
-        (trainset.to_raw_uid(iuid), trainset.to_raw_iid(i), fill)
+        (ruid, trainset.to_raw_iid(i), fill)
         for i in trainset.all_items()
         if i not in user_items
     ]
@@ -25,11 +22,11 @@ def build_testset_anti_testset(trainset, ruid, fill=None):
 
 @load_config("configs/default.yaml")
 def main(cfg: DictConfig):
-    print(f"Looking for recommendations for the user {cfg.recommend.user_id}")
+    logger.info(f"Looking for recommendations for the user {cfg.recommend.user_id}")
 
-    print("Loading available movies...")
+    logger.info("Loading available movies...")
     movies_df = load_movies(cfg.data.movies_file)
-    print(f"Number of movies in the database: {format_number(movies_df.shape[0])}")
+    logger.info(f"Number of movies in the database: {format_number(movies_df.shape[0])}")
 
     movie_id_to_title = movies_df.set_index("movie_id").to_dict("index")
     # add a year to the title
@@ -38,55 +35,41 @@ def main(cfg: DictConfig):
         for k, v in movie_id_to_title.items()
     }
 
-    print(f"Loading model from {cfg.model_path}")
+    logger.info(f"Loading model from {cfg.model_path}")
     model = load_model(cfg.model_path)
 
-    print("Loading ratings data...")
-    ratings_df = load_ratings(cfg.data.rating_files, cfg.data.chunk_size)
-    reader = Reader(rating_scale=(1, 5))
-    trainset = Dataset.load_from_df(
-        ratings_df[["user_id", "movie_id", "rating"]], reader
-    ).build_full_trainset()
-    del ratings_df  # free memory
+    logger.info("Looking for the movies rated by the user...")
+    testset, anti_testset = build_testset_anti_testset(
+        model.trainset, cfg.recommend.user_id
+    )
 
-    print("Looking for the movies rated by the user...")
-    testset, anti_testset = build_testset_anti_testset(trainset, cfg.recommend.user_id)
-
-    user_ratings = []
-    for user_id, movie_id, r_true in testset:
-        user_ratings.append((movie_id, r_true))
-
+    logger.info("Highest rated movies by the user:")
+    logger.info("-" * 40)
+    user_ratings = [(movie_id, r_true) for user_id, movie_id, r_true in testset]
     del testset  # free memory
-
     user_ratings.sort(key=lambda x: x[1], reverse=True)
-    highest_rated_movies = user_ratings[: cfg.recommend.num_recommendations]
-    highest_rated_movies = [
-        movie_id_to_title[movie_id] for movie_id, _ in highest_rated_movies
-    ]
 
-    print("Highest rated movies by the user:")
-    print("-" * 40)
-    for i, movie in enumerate(highest_rated_movies):
-        print(f"{i+1}. ", movie)
+    for i, (movie_id, rating) in enumerate(user_ratings):
+        logger.info(f"{i+1}. {movie_id_to_title[movie_id]} ({rating} stars)")
+        if i == cfg.recommend.num_recommendations - 1:
+            break
 
-    print("Predicting ratings for unrated movies...")
+    logger.info("Predicting ratings for unrated movies...")
     predictions = model.test(anti_testset)
+    del anti_testset
 
-    user_ratings = []
-    for user_id, movie_id, r_true, r_est, _ in predictions:
-        if user_id == cfg.recommend.user_id:
-            user_ratings.append((movie_id, r_est))
-
-    user_ratings.sort(key=lambda x: x[1], reverse=True)
-    recommended_movies = user_ratings[: cfg.recommend.num_recommendations]
-    recommended_movies = [
-        movie_id_to_title[movie_id] for movie_id, _ in recommended_movies
+    logger.info("Recommended movies:")
+    logger.info("-" * 40)
+    user_ratings = [
+        (movie_id, r_est) for user_id, movie_id, r_true, r_est, _ in predictions
     ]
+    del predictions
+    user_ratings.sort(key=lambda x: x[1], reverse=True)
 
-    print("Recommended movies:")
-    print("-" * 40)
-    for i, movie in enumerate(recommended_movies):
-        print(f"{i+1}. ", movie)
+    for i, (movie_id, rating) in enumerate(user_ratings):
+        logger.info(f"{i+1}. {movie_id_to_title[movie_id]} ({rating:.1f} stars)")
+        if i == cfg.recommend.num_recommendations - 1:
+            break
 
 
 if __name__ == "__main__":

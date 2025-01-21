@@ -2,6 +2,7 @@ import json
 import os
 import time
 
+from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 from surprise import Dataset, Reader
 from surprise import accuracy as surprise_metrics
@@ -15,7 +16,6 @@ from netflix_prize.utils import (
     load_config,
     save_model,
 )
-from loguru import logger
 
 
 def print_ratings_info(ratings):
@@ -57,10 +57,11 @@ def main(cfg: DictConfig):
     logger.info("Splitting data...")
     probe_df = load_probe(cfg.data.probe_file, cfg.data.chunk_size)
     train_df, test_df = train_test_split(ratings_df, probe_df)
-    logger.info(f"Train set: {train_df.shape[0]} ratings")  # 99,072,112
-    logger.info(f"Test set: {test_df.shape[0]} ratings")  # 1,408,395
+    logger.info(f"Trainset: {train_df.shape[0]} ratings")  # 99,072,112
+    logger.info(f"Testset: {test_df.shape[0]} ratings")  # 1,408,395
     del ratings_df, probe_df  # free memory
 
+    logger.info("Building trainset...")
     reader = Reader(rating_scale=(1, 5))
     trainset = Dataset.load_from_df(
         train_df[["user_id", "movie_id", "rating"]], reader
@@ -81,13 +82,15 @@ def main(cfg: DictConfig):
     logger.info(f"Model saved to {cfg.output_dir}")
 
     # test
-    logger.info("Evaluating...")
+    logger.info("Building testset...")
     testset = (
         Dataset.load_from_df(test_df[["user_id", "movie_id", "rating"]], reader)
         .build_full_trainset()
         .build_testset()
     )
     del test_df  # free memory
+
+    logger.info("Evaluating...")
     predictions = model.test(testset)
 
     logger.info("Computing metrics...")
