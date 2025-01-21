@@ -21,11 +21,11 @@ python netflix_prize/train.py configs/centered_knn.yaml
 
 ### Recommendations
 ```bash
-python netflix_prize/recommend_movie.py model_path="checkpoints/centered_knn/model.pkl" recommend.movie_title="Toy Story"
+python netflix_prize/recommend_movie.py model_path="checkpoints/centered_knn/20250121-04:18:27/model.pkl" recommend.movie_title="Eternal Sunshine of the Spotless Mind"
 ```
 
 ```bash
-python netflix_prize/recommend_user.py model_path="checkpoints/centered_knn/model.pkl" recommend.user_id=1377724
+python netflix_prize/recommend_user.py model_path="checkpoints/centered_knn/20250121-04:18:27/model.pkl" recommend.user_id=1377724
 ```
 
 

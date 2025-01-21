@@ -43,7 +43,7 @@ def main(cfg: DictConfig):
         model.trainset, cfg.recommend.user_id
     )
 
-    logger.info("Highest rated movies by the user:")
+    logger.info("The highest rated movies by the user:")
     logger.info("-" * 40)
     user_ratings = [(movie_id, r_true) for user_id, movie_id, r_true in testset]
     del testset  # free memory
